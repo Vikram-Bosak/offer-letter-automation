@@ -88,20 +88,7 @@ def extract_details_from_html(html_content):
     return details
 
 def upload_to_drive(drive_service, filepath, filename):
-    file_metadata = {
-        'name': filename,
-        'parents': [DRIVE_FOLDER_ID]
-    }
-    media = MediaFileUpload(filepath, mimetype='application/pdf', resumable=True)
-    file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
-    file_id = file.get('id')
-    
-    permission = {
-        'type': 'anyone',
-        'role': 'reader'
-    }
-    drive_service.permissions().create(fileId=file_id, body=permission).execute()
-    return file.get('webViewLink')
+    pass # Replaced inline in the loop
 
 def setup_sheet_headers(sheet):
     headers = [
@@ -167,40 +154,60 @@ def main():
                     print(f"No candidate data found for ID {current_id}. Skipping to next.")
                     continue
                 
-                # Format Filename (Ref : VV/26/ICT-II/10 -> VV-26-ICT-II-10.pdf)
+                # Format Filename
                 safe_ref = details['ref_number'].replace('Ref : ', '').strip()
                 safe_filename = safe_ref.replace('/', '-') + '.pdf'
                 
-                # Generate PDF locally
-                temp_pdf_path = f"temp_{safe_filename}"
-                page.pdf(path=temp_pdf_path, format="A4", print_background=True)
+                drive_url = ""
+                status_msg = "Uploaded"
                 
-                # 2. Upload to Google Drive
-                print(f"  Uploading {safe_filename} to Drive...")
-                drive_url = upload_to_drive(drive_service, temp_pdf_path, safe_filename)
+                try:
+                    # Generate PDF locally
+                    temp_pdf_path = f"temp_{safe_filename}"
+                    page.pdf(path=temp_pdf_path, format="A4", print_background=True)
+                    
+                    # 2. Upload to Google Drive (with supportsAllDrives=True)
+                    print(f"  Uploading {safe_filename} to Drive...")
+                    file_metadata = {
+                        'name': safe_filename,
+                        'parents': [DRIVE_FOLDER_ID]
+                    }
+                    media = MediaFileUpload(temp_pdf_path, mimetype='application/pdf', resumable=True)
+                    file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink', supportsAllDrives=True).execute()
+                    file_id = file.get('id')
+                    
+                    permission = {
+                        'type': 'anyone',
+                        'role': 'reader'
+                    }
+                    drive_service.permissions().create(fileId=file_id, body=permission, supportsAllDrives=True).execute()
+                    drive_url = file.get('webViewLink')
+                    
+                    if os.path.exists(temp_pdf_path):
+                        os.remove(temp_pdf_path)
+                except Exception as upload_error:
+                    status_msg = f"Failed Upload: {str(upload_error)[:80]}"
+                    print(f"Drive Upload Error for ID {current_id}: {upload_error}")
                 
-                if os.path.exists(temp_pdf_path):
-                    os.remove(temp_pdf_path)
-                
-                # 3. Update Google Sheet
+                # 3. Update Google Sheet with whatever details we have
                 print(f"  Adding to Google Sheet...")
                 row_data = [
                     current_id, details['candidate_name'], details['father_name'],
                     details['block'], details['district'], details['school'],
                     details['udise_code'], details['ref_number'], target_url,
-                    safe_filename, drive_url, 'Uploaded'
+                    safe_filename, drive_url, status_msg
                 ]
                 
                 sheet.insert_row(row_data, next_row_index)
                 next_row_index += 1
                 
-                print(f"ID {current_id}: Success!")
+                print(f"ID {current_id}: Processed (Status: {status_msg})")
                 time.sleep(2)
 
             except Exception as e:
-                error_msg = f"Failed: {str(e)}"
+                error_msg = f"Failed Processing: {str(e)}"
                 print(f"ID {current_id}: {error_msg}")
-                # Log failure to sheet
+                # Log total failure to sheet (if page completely fails)
                 fail_row = [
                     current_id, "", "", "", "", "", "", "", target_url, "", "", error_msg[:100]
                 ]
