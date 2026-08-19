@@ -27,7 +27,9 @@ jobs:
 
       - name: Create Google Credentials File
         run: |
-          echo "${{ secrets.GCP_CREDENTIALS }}" > credentials.json
+          cat << 'EOF' > credentials.json
+          ${{ secrets.GCP_CREDENTIALS }}
+          EOF
 
       - name: Run Automation Script
         run: |
