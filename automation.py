@@ -1,10 +1,13 @@
 import os
 import re
 import time
+import json
 
 # Google APIs
 import gspread
-from google.oauth2.service_account import Credentials
+from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
@@ -30,6 +33,24 @@ SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive'
 ]
+
+def get_oauth_credentials():
+    """Load credentials dynamically, supporting both Service Account and User OAuth Tokens."""
+    if not os.path.exists(CREDENTIALS_FILE):
+        raise FileNotFoundError(f"{CREDENTIALS_FILE} not found.")
+        
+    with open(CREDENTIALS_FILE, 'r') as f:
+        token_data = json.load(f)
+        
+    if token_data.get("type") == "service_account":
+        print("Loading Service Account credentials...")
+        return service_account.Credentials.from_service_account_info(token_data, scopes=SCOPES)
+    else:
+        print("Loading User OAuth credentials...")
+        creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        return creds
 
 def extract_details_from_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -87,9 +108,6 @@ def extract_details_from_html(html_content):
 
     return details
 
-def upload_to_drive(drive_service, filepath, filename):
-    pass # Replaced inline in the loop
-
 def setup_sheet_headers(sheet):
     headers = [
         "S.No.", "Candidate Name", "Father's Name", "Block", "District", 
@@ -116,7 +134,7 @@ def get_processed_ids(sheet):
 
 def main():
     print("Authenticating with Google...")
-    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+    creds = get_oauth_credentials()
     gc = gspread.authorize(creds)
     drive_service = build('drive', 'v3', credentials=creds)
 
@@ -166,7 +184,7 @@ def main():
                     temp_pdf_path = f"temp_{safe_filename}"
                     page.pdf(path=temp_pdf_path, format="A4", print_background=True)
                     
-                    # 2. Upload to Google Drive (with supportsAllDrives=True)
+                    # 2. Upload to Google Drive
                     print(f"  Uploading {safe_filename} to Drive...")
                     file_metadata = {
                         'name': safe_filename,
