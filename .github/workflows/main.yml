@@ -29,7 +29,7 @@ jobs:
         run: |
           sudo apt-get update
           echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
-          sudo apt-get install -y ttf-mscorefonts-installer
+          sudo apt-get install -y ttf-mscorefonts-installer fonts-indic fonts-noto fonts-deva
           sudo fc-cache -f -v
 
       - name: Create Google Credentials File
