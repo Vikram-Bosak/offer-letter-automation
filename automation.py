@@ -186,17 +186,52 @@ def main():
                 
                 drive_url = ""
                 status_msg = "Uploaded"
+                temp_pdf_path = f"temp_{safe_filename}"
                 
                 try:
-                    # Generate PDF locally (Ctrl+P style)
-                    temp_pdf_path = f"temp_{safe_filename}"
-                    # Add standard margins to ensure it breaks at 2 pages just like Chrome's default Ctrl+P
-                    page.pdf(
-                        path=temp_pdf_path, 
-                        format="A4", 
-                        print_background=True,
-                        margin={"top": "1cm", "right": "1cm", "bottom": "1cm", "left": "1cm"}
-                    )
+                    # Method 1: Check if there's an embedded PDF viewer
+                    embeds = page.locator("embed[type='application/pdf'], iframe[src$='.pdf']").all()
+                    
+                    # Method 2: Check for a native Download button
+                    download_btn = page.locator("button:has-text('Download'), a:has-text('Download PDF'), button:has-text('Print')").first
+                    
+                    if len(embeds) > 0:
+                        print("  Found embedded PDF, downloading source...")
+                        pdf_src = embeds[0].get_attribute("src")
+                        # Download using Playwright's page context
+                        pdf_response = page.request.get(pdf_src)
+                        with open(temp_pdf_path, 'wb') as f:
+                            f.write(pdf_response.body())
+                            
+                    elif download_btn.is_visible():
+                        print("  Found Download/Print button, clicking to download original PDF...")
+                        try:
+                            with page.expect_download(timeout=15000) as download_info:
+                                download_btn.click()
+                            download = download_info.value
+                            download.save_as(temp_pdf_path)
+                        except Exception as dl_error:
+                            print(f"  Button click didn't trigger download, falling back to Ctrl+P: {dl_error}")
+                            # Scroll to bottom to ensure lazy-loaded images (photos, signatures) are loaded
+                            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                            page.wait_for_timeout(3000)
+                            page.evaluate("window.scrollTo(0, 0)")
+                            page.pdf(path=temp_pdf_path, format="A4", print_background=True, margin={"top": "1cm", "right": "1cm", "bottom": "1cm", "left": "1cm"})
+                    
+                    else:
+                        print("  No direct download found. Using Chrome's Ctrl+P (Print to PDF)...")
+                        # Scroll to bottom to ensure lazy-loaded images (photos, signatures) are loaded
+                        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        page.wait_for_timeout(3000)
+                        page.evaluate("window.scrollTo(0, 0)")
+                        
+                        # Generate PDF locally (Ctrl+P style)
+                        page.pdf(
+                            path=temp_pdf_path, 
+                            format="A4", 
+                            print_background=True,
+                            margin={"top": "1cm", "right": "1cm", "bottom": "1cm", "left": "1cm"}
+                        )
                     
                     # 2. Upload to Google Drive
                     print(f"  Uploading {safe_filename} to Drive...")
