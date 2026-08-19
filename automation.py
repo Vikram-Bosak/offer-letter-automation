@@ -149,7 +149,8 @@ def main():
     # Start Playwright for PDF generation
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
+        # Set a standard desktop viewport so the responsive layout matches a desktop print preview
+        context = browser.new_context(viewport={'width': 1920, 'height': 1080})
         page = context.new_page()
 
         for current_id in range(START_NUMBER, END_NUMBER + 1):
@@ -189,8 +190,13 @@ def main():
                 try:
                     # Generate PDF locally (Ctrl+P style)
                     temp_pdf_path = f"temp_{safe_filename}"
-                    # No emulate_media("screen") so it uses standard print layout like the user's screenshot
-                    page.pdf(path=temp_pdf_path, format="A4", print_background=True)
+                    # Add standard margins to ensure it breaks at 2 pages just like Chrome's default Ctrl+P
+                    page.pdf(
+                        path=temp_pdf_path, 
+                        format="A4", 
+                        print_background=True,
+                        margin={"top": "1cm", "right": "1cm", "bottom": "1cm", "left": "1cm"}
+                    )
                     
                     # 2. Upload to Google Drive
                     print(f"  Uploading {safe_filename} to Drive...")
