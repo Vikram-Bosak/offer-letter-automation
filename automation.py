@@ -187,10 +187,9 @@ def main():
                 status_msg = "Uploaded"
                 
                 try:
-                    # Generate PDF exactly as seen on screen (bypassing print-mode CSS issues)
-                    page.emulate_media(media="screen")
-                    
+                    # Generate PDF locally (Ctrl+P style)
                     temp_pdf_path = f"temp_{safe_filename}"
+                    # No emulate_media("screen") so it uses standard print layout like the user's screenshot
                     page.pdf(path=temp_pdf_path, format="A4", print_background=True)
                     
                     # 2. Upload to Google Drive
