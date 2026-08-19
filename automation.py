@@ -162,14 +162,13 @@ def main():
             print(f"Processing ID {current_id} - Link: {target_url}")
             
             try:
-                # 1. Download PDF using Playwright
-                page.emulate_media(media="print")
+                # 1. Load the webpage
                 
                 # Wait for load instead of networkidle to avoid timeout on ad/tracking scripts
                 page.goto(target_url, wait_until="load", timeout=60000)
                 
-                # Give it an extra 5 seconds to fully render the page and images
-                page.wait_for_timeout(5000)
+                # Give it an extra 10 seconds to fully render the page, fonts, and images (prevents missing data)
+                page.wait_for_timeout(10000)
                 
                 html_content = page.content()
                 details = extract_details_from_html(html_content)
@@ -177,7 +176,7 @@ def main():
                 if not details['candidate_name'] or not details['ref_number']:
                     print(f"No candidate data found for ID {current_id}. Skipping to next.")
                     # Sleep slightly on failure to prevent hammering
-                    time.sleep(5)
+                    time.sleep(10)
                     continue
                 
                 # Format Filename
@@ -188,7 +187,9 @@ def main():
                 status_msg = "Uploaded"
                 
                 try:
-                    # Generate PDF locally (Ctrl+P style)
+                    # Generate PDF exactly as seen on screen (bypassing print-mode CSS issues)
+                    page.emulate_media(media="screen")
+                    
                     temp_pdf_path = f"temp_{safe_filename}"
                     page.pdf(path=temp_pdf_path, format="A4", print_background=True)
                     
@@ -229,9 +230,9 @@ def main():
                 
                 print(f"ID {current_id}: Processed (Status: {status_msg})")
                 
-                # Sleep for 10 seconds to prevent the server from blocking us again
-                print(f"Waiting 10 seconds to prevent rate limiting...")
-                time.sleep(10)
+                # Sleep for 15 seconds to prevent the server from blocking us again
+                print(f"Waiting 15 seconds to prevent rate limiting...")
+                time.sleep(15)
 
             except Exception as e:
                 error_msg = f"Failed Processing: {str(e)}"
