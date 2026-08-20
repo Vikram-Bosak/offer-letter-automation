@@ -25,7 +25,7 @@ DRIVE_FOLDER_ID = '1zy-VUyCC8ejOQ3S2wP3-D24xKwlKiHMm'
 # ==========================================
 # SCRAPING RANGE (Edit these as needed)
 # ==========================================
-START_NUMBER = 1
+START_NUMBER = 706
 END_NUMBER = 1000
 BASE_URL = 'https://vistarvision.com/appointment_letter?no=VV/26/ICT-II/'
 
